@@ -8,17 +8,20 @@ import zipfile
 import humanize
 import requests
 from logzero import logger
-from uiautomator2.version import __atx_agent_version__, __apk_version__
+from uiautomator2.version import __apk_version__, __atx_agent_version__
 
-__all__ = ["get_atx_agent_bundle",
-           "get_uiautomator_apks", "get_whatsinput_apk"]
+import settings
+
+__all__ = [
+    "get_atx_agent_bundle", "get_uiautomator_apks", "get_whatsinput_apk"
+]
 
 
 def get_atx_agent_bundle() -> str:
     """
     bundle all platform atx-agent binary into one zip file
     """
-    version = __atx_agent_version__
+    version = settings.atx_agent_version
     target_zip = f"vendor/atx-agent-{version}.zip"
     if not os.path.isfile(target_zip):
         os.makedirs("vendor", exist_ok=True)
@@ -29,23 +32,23 @@ def get_atx_agent_bundle() -> str:
 def get_uiautomator_apks() -> tuple:
     version = __apk_version__
     print(">>> app-uiautomator.apk verison:", version)
-    apk_url = "https://github.com/openatx/android-uiautomator-server/releases/download/{}/app-uiautomator.apk".format(
-        version)
+    apk_url = f"https://github.com/openatx/android-uiautomator-server/releases/download/{version}/app-uiautomator.apk"
     target_dir = f"vendor/app-uiautomator-{version}"
-    apk_path = mirror_download(apk_url, os.path.join(
-        target_dir, "app-uiautomator.apk"))
+    apk_path = mirror_download(apk_url,
+                               os.path.join(target_dir, "app-uiautomator.apk"))
 
-    apk_test_url = "https://github.com/openatx/android-uiautomator-server/releases/download/{}/app-uiautomator-test.apk".format(
-        version)
-    apk_test_path = mirror_download(apk_test_url, os.path.join(
-        target_dir, "app-uiautomator-test.apk"))
+    apk_test_url = f"https://github.com/openatx/android-uiautomator-server/releases/download/{version}/app-uiautomator-test.apk"
+    print(">>> app-uiautomator-test.apk verison:", version)
+    apk_test_path = mirror_download(
+        apk_test_url, os.path.join(target_dir, "app-uiautomator-test.apk"))
     return (apk_path, apk_test_path)
 
 
 def get_whatsinput_apk() -> str:
     target_path = "vendor/WhatsInput-1.0.apk"
     mirror_download(
-        "https://github.com/openatx/atxserver2-android-provider/releases/download/v0.2.0/WhatsInput_v1.0.apk", target_path)
+        "https://github.com/openatx/atxserver2-android-provider/releases/download/v0.2.0/WhatsInput_v1.0.apk",
+        target_path)
     return target_path
 
 
@@ -57,7 +60,9 @@ def get_stf_binaries() -> str:
     """
     version = "0.2.1"
     target_path = f"vendor/stf-binaries-{version}.zip"
-    mirror_download(f"https://github.com/openatx/stf-binaries/archive/{version}.zip", target_path)
+    mirror_download(
+        f"https://github.com/openatx/stf-binaries/archive/{version}.zip",
+        target_path)
     return target_path
 
 
@@ -66,7 +71,7 @@ def get_all():
     get_uiautomator_apks()
     get_whatsinput_apk()
     get_stf_binaries()
-    
+
 
 def create_atx_agent_bundle(version: str, target_zip: str):
     print(">>> Bundle atx-agent verison:", version)
@@ -80,7 +85,9 @@ def create_atx_agent_bundle(version: str, target_zip: str):
     with tempfile.TemporaryDirectory(prefix="tmp-") as tmpdir:
         tmp_target_zip = target_zip + ".part"
 
-        with zipfile.ZipFile(tmp_target_zip, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(tmp_target_zip,
+                             "w",
+                             compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr(version, "")
 
             for arch in ("386", "amd64", "armv6", "armv7"):
@@ -89,9 +96,9 @@ def create_atx_agent_bundle(version: str, target_zip: str):
                 mirror_download(url, storepath)
 
                 with tarfile.open(storepath, "r:gz") as t:
-                    t.extract("atx-agent", path=tmpdir+"/"+arch)
-                    z.write(
-                        "/".join([tmpdir, arch, "atx-agent"]), "atx-agent-"+arch)
+                    t.extract("atx-agent", path=tmpdir + "/" + arch)
+                    z.write("/".join([tmpdir, arch, "atx-agent"]),
+                            "atx-agent-" + arch)
         shutil.move(tmp_target_zip, target_zip)
         print(">>> Zip created", target_zip)
 
@@ -109,7 +116,7 @@ def mirror_download(url: str, target: str) -> str:
             github_host):]  # mirror of github
         try:
             return download(mirror_url, target)
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             logger.debug("download from mirror error, use origin source")
 
     return download(url, target)
@@ -129,9 +136,12 @@ def download(url: str, storepath: str):
         for buf in r.iter_content(chunk_length):
             bytes_so_far += len(buf)
             print(f"\r{prefix} {bytes_so_far} / {total_size}",
-                  end="", flush=True)
+                  end="",
+                  flush=True)
             f.write(buf)
         print(" [Done]")
+    if total_size != -1 and os.path.getsize(storepath + ".part") != total_size:
+        raise ValueError("download size mismatch")
     shutil.move(storepath + '.part', storepath)
 
 
