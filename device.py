@@ -243,7 +243,7 @@ class AndroidDevice(object):
     async def reset(self):
         """ 設備使用完后的清理工作 """
         self.close()
-        await adb.shell(self._serial, "input keyevent HOME")
+        #await adb.shell(self._serial, "input keyevent HOME")
         await self.init()
 
     def wait(self):

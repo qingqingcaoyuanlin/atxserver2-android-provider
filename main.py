@@ -245,7 +245,7 @@ async def device_watch(allow_remote: bool = False):
                 device = AndroidDevice(event.serial, partial(callback, udid))
 
                 await device.init()
-                await device.open_identify()
+                #await device.open_identify()
 
                 udid2device[udid] = device
 
